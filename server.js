@@ -1,9 +1,10 @@
-const express = require('express');
-const db = require('./config/db');
+require('dotenv').config(); // ✅ MUST BE FIRST
 
+const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+
 const app = express();
+
 app.use(express.json());
 
 app.use(cors({
@@ -16,23 +17,8 @@ const authRoutes = require('./routes/auth');
 const verifyToken = require('./middleware/authMiddleware');
 const expenseRoutes = require('./routes/expenses');
 
-
-
 app.use('/auth', authRoutes);
-
-
-
-
-
-
-
-
-
-
-
 app.use('/expenses', expenseRoutes);
-
-
 
 app.get('/', (req, res) => {
   res.send("API is running...");
@@ -44,7 +30,6 @@ app.get('/protected', verifyToken, (req, res) => {
     user: req.user
   });
 });
-
 
 const PORT = process.env.PORT || 5000;
 
