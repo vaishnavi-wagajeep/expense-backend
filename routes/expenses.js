@@ -1,103 +1,93 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db');
+
 const verifyToken = require('../middleware/authMiddleware');
 
+// 👉 TEMP STORAGE
+let expenses = [];
 
-// =======================
-// ✅ ADD EXPENSE
-// =======================
+/* ================= ADD EXPENSE ================= */
 router.post('/add', verifyToken, (req, res) => {
-  const { category, amount, date, notes } = req.body;
-  const userId = req.user.id;
+  try {
+    const { Category, Amount, Date: expenseDate, Notes } = req.body;
 
-  // Basic validation
-  if (!category || !amount || !date) {
-    return res.status(400).json({ error: "Please fill all required fields" });
+    if (!Category || !Amount || !expenseDate) {
+      return res.status(400).json({
+        error: "Category, Amount and Date are required"
+      });
+    }
+
+    const dateObj = new Date(expenseDate);
+
+    const newExpense = {
+      ExpenseID: Date.now(),
+      Category,
+      Amount: parseFloat(Amount),
+      Date: expenseDate,
+      Notes: Notes || "",
+      userId: req.user ? req.user.id : "demoUser",
+
+      // ✅ month + year
+      month: dateObj.getMonth(),
+      year: dateObj.getFullYear()
+    };
+
+    expenses.push(newExpense);
+
+    res.status(201).json({
+      message: "Expense added successfully",
+      data: newExpense
+    });
+
+  } catch (err) {
+    console.error("ADD ERROR:", err);
+    res.status(500).json({
+      error: "Server error while adding expense"
+    });
   }
-
-  const sql = `
-    INSERT INTO Expenses (UserID, Category, Amount, Date, Notes)
-    VALUES (?, ?, ?, ?, ?)
-  `;
-
-  db.query(sql, [userId, category, amount, date, notes], (err, result) => {
-    if (err) {
-      console.log("DB ERROR:", err);
-      return res.status(500).json({ error: err.message });
-    }
-
-    res.json({ message: "Expense added successfully" });
-  });
 });
 
-
-// =======================
-// ✅ GET ALL EXPENSES
-// =======================
+/* ================= GET EXPENSES (UPDATED) ================= */
 router.get('/', verifyToken, (req, res) => {
-  const userId = req.user.id;
+  try {
+    const { month, year } = req.query;
 
-  const sql = "SELECT * FROM Expenses WHERE UserID = ? ORDER BY Date DESC";
+    let filteredExpenses = expenses;
 
-  db.query(sql, [userId], (err, results) => {
-    if (err) {
-      console.log("DB ERROR:", err);
-      return res.status(500).json({ error: err.message });
+    // ✅ If frontend sends month/year → filter
+    if (month !== undefined && year !== undefined) {
+      filteredExpenses = expenses.filter(exp =>
+        exp.month === Number(month) &&
+        exp.year === Number(year)
+      );
     }
 
-    res.json(results);
-  });
+    res.json(filteredExpenses);
+
+  } catch (err) {
+    console.error("FETCH ERROR:", err);
+    res.status(500).json({
+      error: "Error fetching expenses"
+    });
+  }
 });
 
+/* ================= DELETE EXPENSE ================= */
+router.delete('/:id', verifyToken, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
 
-// =======================
-// ✅ UPDATE EXPENSE
-// =======================
-router.put('/update/:id', verifyToken, (req, res) => {
-  const expenseId = req.params.id;
-  const { category, amount, date, notes } = req.body;
-  const userId = req.user.id;
+    expenses = expenses.filter(exp => exp.ExpenseID !== id);
 
-  const sql = `
-    UPDATE Expenses 
-    SET Category = ?, Amount = ?, Date = ?, Notes = ?
-    WHERE ExpenseID = ? AND UserID = ?
-  `;
+    res.json({
+      message: "Expense deleted"
+    });
 
-  db.query(
-    sql,
-    [category, amount, date, notes, expenseId, userId],
-    (err, result) => {
-      if (err) {
-        console.log("DB ERROR:", err);
-        return res.status(500).json({ error: err.message });
-      }
-
-      res.json({ message: "Expense updated successfully" });
-    }
-  );
+  } catch (err) {
+    res.status(500).json({
+      error: "Delete failed"
+    });
+  }
 });
-
-
-// =======================
-// ✅ DELETE EXPENSE
-// =======================
-router.delete('/delete/:id', verifyToken, (req, res) => {
-  const expenseId = req.params.id;
-  const userId = req.user.id;
-
-  const sql = "DELETE FROM Expenses WHERE ExpenseID = ? AND UserID = ?";
-
-  db.query(sql, [expenseId, userId], (err, result) => {
-    if (err) {
-      console.log("DB ERROR:", err);
-      return res.status(500).json({ error: err.message });
-    }
-
-    res.json({ message: "Expense deleted successfully" });
-  });
-});
-
 
 module.exports = router;
